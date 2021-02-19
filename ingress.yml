@@ -1,0 +1,68 @@
+---
+- hosts: master
+  user: root
+  gather_facts: yes
+  tasks:
+    -
+    - name: copy helm
+      copy:
+        src: ./pack/helm_install.sh
+        dest: /tmp/helm_install.sh
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: install helm
+      shell: |
+        bash /tmp/helm_install.sh
+
+    - name: copy helm
+      copy:
+        src: ./pack/helm_install.sh
+        dest: /tmp/helm_install.sh
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: install helm
+      shell: |
+        bash /tmp/helm_install.sh
+
+    - name: helm repo add
+      shell: |
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+      ignore_errors: yes
+
+    - name: helm repo update
+      shell: |
+        helm repo update
+
+    - name: create a namespace
+      shell: |
+        kubectl create ns ingress-nginx
+      ignore_errors: yes
+
+    - name: copy customized nginx yaml
+      copy:
+        src: ./ingress/ingress-nginx.yaml
+        dest: /tmp/ingress-nginx.yaml
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: apply nginx ingress with helm
+      shell: |
+        helm install nginx ingress-nginx/ingress-nginx -n ingress-nginx --values /tmp/ingress-nginx.yaml
+      ignore_errors: yes
+
+    - name: copy prometheus ingress
+      copy:
+        src: ./ingress/prometheus-ingress.yml
+        dest: /tmp/prometheus-ingress.yml
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: create prometheus ingress
+      shell: |
+        kubectl create -f /tmp/prometheus-ingress.yml

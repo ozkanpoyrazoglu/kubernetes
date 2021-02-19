@@ -1,0 +1,9 @@
+[kube_cluster1]
+k8s-master ansible_host=8.208.90.120 ansible_user=root
+worker1 ansible_host=8.208.16.69 ansible_user=root
+
+[master]
+k8s-master ansible_host=8.208.90.120 ansible_user=root
+
+[worker]
+worker1 ansible_host=8.208.16.69 ansible_user=root

@@ -1,0 +1,174 @@
+---
+- hosts: kube_cluster1
+  user: root
+  become: yes
+  gather_facts: yes
+  vars:
+    selinux_path: "/etc/selinux/config"
+    docker_repo: "https://download.docker.com/linux/centos/docker-ce.repo"
+    kubernetes_repo: |
+      [kubernetes]
+      name=Kubernetes
+      baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+      enabled=1
+      gpgcheck=1
+      repo_gpgcheck=1
+      gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+  tasks:
+    - name: add google dns entry in resolver
+      blockinfile:
+        path: /etc/resolv.conf
+        insertafter: EOF
+        block: "nameserver 8.8.8.8"
+      ignore_errors: yes
+
+    - name: stop and disable firewalld
+      service:
+        name: firewalld
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+
+    - name: kill selinux
+      command: setenforce 0
+      ignore_errors: yes
+
+    - name: disable selinux
+      selinux:
+        state: disabled
+        conf: "{{selinux_path}}"
+      ignore_errors: yes
+
+    - name: swapoff
+      command: swapoff -a
+      ignore_errors: yes
+
+    - name: emptying fstab
+      mount:
+        name: swap
+        fstype: swap
+        state: absent
+      ignore_errors: yes
+
+    - name: net.bridge.bridge-nf-call-iptables 1
+      sysctl:
+        name: net.bridge.bridge-nf-call-iptables
+        value: 1
+        state: present
+      ignore_errors: yes
+
+    - name: net.bridge.bridge-nf-call-ip6tables 1
+      sysctl:
+        name: net.bridge.bridge-nf-call-ip6tables
+        value: 1
+        state: present
+      ignore_errors: yes
+
+    - name: reboot instance
+      reboot:
+
+    - name: edit hosts file
+      lineinfile:
+        dest: /etc/hosts
+        regexp: '.*{{ item }}$'
+        line: "{{ hostvars[item].ansible_host }} {{item}}"
+        state: present
+      when: hostvars[item].ansible_host is defined
+      with_items: "{{ groups.all }}"
+
+    - name: install epel
+      yum:
+        name: epel-release
+        state: present
+        update_cache: true
+      ignore_errors: yes
+
+    - name: install open-vm-tools and net-tools
+      yum:
+        name: "{{ packages }}"
+      vars:
+        packages:
+          - open-vm-tools
+          - net-tools
+      ignore_errors: yes
+
+    - name: setting docker repo
+      command: yum-config-manager --add-repo {{ docker_repo }}
+      ignore_errors: yes
+
+    - name: installing docker
+      yum:
+        name: "{{ packages }}"
+      vars:
+        packages:
+          - docker
+      ignore_errors: yes
+
+    - name: installing dependecies for persistent data
+      yum:
+        name: "{{ packages }}"
+      vars:
+        packages:
+          - yum-utils
+          - device-mapper-persistent-data
+          - lvm2
+      ignore_errors: yes
+
+    - name: install dnsmasq
+      yum:
+        name: "{{packages}}"
+      vars:
+        packages:
+          - dnsmasq
+      ignore_errors: yes
+
+    - name: start and enable dnsmasq
+      service:
+        name: dnsmasq
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+    - name: start and enable docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+    - name: adding k8s repo
+      copy:
+        dest: "/etc/yum.repos.d/kubernetes.repo"
+        content: "{{ kubernetes_repo }}"
+      ignore_errors: yes
+
+    - name: installing k8s
+      command: yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+      ignore_errors: yes
+
+    - name: start enable kubelet
+      service:
+        name: kubelet
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+    - name: install git
+      shell: |
+        yum install git -y
+      ignore_errors: yes
+
+    - name: install wget
+      shell: |
+        yum install wget -y
+
+- import_playbook: master.yml
+
+- import_playbook: worker.yml
+
+#- import_playbook: changeclustername.yml
+
+- import_playbook: monitoring.yml
+
+- import_playbook: ingress.yml

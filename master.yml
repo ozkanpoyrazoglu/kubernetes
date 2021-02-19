@@ -1,0 +1,42 @@
+---
+- hosts: master
+  user: root
+  vars:
+    cidr: 10.244.0.0/16
+    network_plugin: https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
+    network_rbac: https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel-rbac.yml
+    advertise_ip: 10.1.11.241
+    local_token: /tmp/jointoken
+    api_addr: "{{ansible_default_ipv4.address}}"
+  tasks:
+
+    - name: init cluster
+      command: kubeadm init --pod-network-cidr={{cidr}} --apiserver-advertise-address={{api_addr}}
+      ignore_errors: yes
+
+    - name: .kube directory
+      shell: |
+        mkdir -p $HOME/.kube
+        sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
+        sudo chown $(id -u):$(id -g) $HOME/.kube/config
+      ignore_errors: yes
+
+    - name: install network plugin
+      command: kubectl apply -f {{network_plugin}}
+      ignore_errors: yes
+
+    - name: create a join token
+      shell: kubeadm token create --print-join-command
+      register: join_cmd
+      ignore_errors: yes
+
+    - set_fact:
+        join_command: "{{ join_cmd.stdout }}"
+
+    - name: save join token to local file
+      local_action: copy content={{join_cmd.stdout}} dest={{local_token}}
+      ignore_errors: yes
+
+    - debug: var=join_command
+
+

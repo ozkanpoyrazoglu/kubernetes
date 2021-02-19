@@ -1,0 +1,26 @@
+- hosts: localhost
+  gather_facts: no
+  vars:
+    local_token: /tmp/jointoken
+
+  tasks:
+    - name: take token
+      command: cat {{local_token}}
+      register: token
+      ignore_errors: yes
+
+    - set_fact:
+        token: "{{token.stdout}}"
+
+- hosts: worker
+  become: yes
+  vars:
+    jointoken: "{{ hostvars['localhost'].token }}"
+  tasks:
+    - name: reset kubeadm
+      shell: |
+        kubeadm reset -f
+      ignore_errors: yes
+
+    - name: join to master
+      shell: "{{jointoken}}"

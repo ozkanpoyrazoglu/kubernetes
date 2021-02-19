@@ -1,0 +1,67 @@
+---
+- hosts: master
+  user: root
+  gather_facts: no
+  tasks:
+    - name: taint worker node
+      shell: |
+        kubectl taint nodes worker1 monitoringnode=true:NoSchedule
+      ignore_errors: yes
+
+    - name: create a namespace for monitoring
+      shell: |
+        kubectl create ns monitoring
+      ignore_errors: yes
+
+    - name: copy cluster role
+      copy:
+        src: ./prometheus/clusterRole.yaml
+        dest: /tmp/clusterRole.yaml
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: create cluster role
+      shell: |
+        kubectl create -f /tmp/clusterRole.yaml
+      ignore_errors: yes
+
+    - name: copy configmap
+      copy:
+        src: ./prometheus/config-map.yaml
+        dest: /tmp/config-map.yaml
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: create configmap
+      shell: |
+        kubectl create -f /tmp/config-map.yaml
+      ignore_errors: yes
+
+    - name: copy deployment
+      copy:
+        src: ./prometheus/prometheus-deployment.yaml
+        dest: /tmp/prometheus-deployment.yaml
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: apply prometheus deployment
+      shell: |
+        kubectl create -f /tmp/prometheus-deployment.yaml
+      ignore_errors: yes
+
+    - name: copy prometheus service
+      copy:
+        src: ./prometheus/prometheus-service.yaml
+        dest: /tmp/prometheus-service.yaml
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: apply prometheus service
+      shell: |
+        kubectl create -f /tmp/prometheus-service.yaml -n monitoring
+      ignore_errors: yes
+
