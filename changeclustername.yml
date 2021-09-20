@@ -14,7 +14,7 @@
       lineinfile:
         path: /tmp/clusterconfig.yaml
         regexp: '(.*)clusterName(.*)$'
-        line: '\\s clusterName: case-ozkanpoyrazoglu.abc'
+        line: '\\s clusterName: ozkanpoyrazoglu.abc'
         backrefs: yes
 
     - name: import config
